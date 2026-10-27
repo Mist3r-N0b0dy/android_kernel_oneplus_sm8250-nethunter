@@ -50,6 +50,7 @@ struct rpc_clnt {
 	struct rpc_iostats *	cl_metrics;	/* per-client statistics */
 
 	unsigned int		cl_softrtry : 1,/* soft timeouts */
+				cl_softerr  : 1,/* softerr: ETIMEDOUT instead of EIO */
 				cl_discrtry : 1,/* disconnect before retry */
 				cl_noretranstimeo: 1,/* No retransmit timeouts */
 				cl_autobind : 1,/* use getport() */
