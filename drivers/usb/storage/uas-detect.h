@@ -123,10 +123,19 @@ static int uas_use_uas_driver(struct usb_interface *intf,
 	 *
 	 * Reported-by: Hongling Zeng <zenghongling@kylinos.cn>
 	 */
+	/*
+	 * RTL9210-based enclosures (0bda:9210) have a broken/partial UAS
+	 * implementation: sustained writes above ~USB 2.0 speeds produce I/O
+	 * errors and the device is taken offline by the SCSI layer.
+	 * Confirmed on 2026-10-16 with a generic RTL9210C enclosure + 256 GB
+	 * NVMe: a 500 MB write succeeded, then a 9.7 GB copy failed with 34
+	 * I/O errors and the disk went offline.
+	 * (The upstream entry only covers the HIKSEMI MD202 variant.)
+	 * Force usb-storage (BOT) for all of them: on a USB 3.0 link this is
+	 * both stable and fast enough.
+	 */
 	if (le16_to_cpu(udev->descriptor.idVendor) == 0x0bda &&
-			le16_to_cpu(udev->descriptor.idProduct) == 0x9210 &&
-			(udev->manufacturer && !strcmp(udev->manufacturer, "HIKSEMI")) &&
-			(udev->product && !strcmp(udev->product, "MD202")))
+			le16_to_cpu(udev->descriptor.idProduct) == 0x9210)
 		flags |= US_FL_IGNORE_UAS;
 
 	usb_stor_adjust_quirks(udev, &flags);
