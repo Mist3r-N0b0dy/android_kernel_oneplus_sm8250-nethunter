@@ -33,8 +33,8 @@ built with Android clang 12.0.7 (r416183b1), CONFIG_CFI_CLANG + THINLTO
 | the running kernel is this build | `uname -r`, `/proc/version` | name + `(Mist3r_N0b0dy@nethunter-op8t)` |
 | the running config is this tree's | `zcat /proc/config.gz \| grep CONFIG_CC_WERROR` | `=y` (`IKCONFIG`) |
 | CFI / LTO enforced | same file, `CFI_CLANG` `CFI_CLANG_SHADOW` `LTO_CLANG` `THINLTO` | all `=y`, `CFI_PERMISSIVE` off |
-| 16 USB Wi-Fi drivers built in | `ls /sys/bus/usb/drivers` | ath9k_htc, carl9170, dvb_usb_rtl28xxu, mt7601u, mt76x2u, p54usb, r8188eu, rt2500usb, rt2800usb, rtl8150, rtl8187, rtl8192cu, rtl88x2bu, rtl88XXau, rtl8xxxu, zd1211rw |
-| p54usb + NCI core | `grep -w 'p54u_driver\|nci_register_device' /proc/kallsyms` | present |
+| 16 USB drivers built in (Wi-Fi, SDR, ethernet) | `ls /sys/bus/usb/drivers` | ath9k_htc, carl9170, dvb_usb_rtl28xxu, mt7601u, mt76x2u, p54usb, r8188eu, rt2500usb, rt2800usb, rtl8150, rtl8187, rtl8192cu, rtl88x2bu, rtl88XXau, rtl8xxxu, zd1211rw |
+| p54usb + NCI core | `grep -w p54u_driver /proc/kallsyms`, then `nci_register_device` | both present |
 | CAN stack | `ip link add dev vcan0 type vcan` | works |
 | USB gadget + HID | `mount -t configfs configfs /sys/kernel/config` then `mkdir …/usb_gadget/g/functions/hid.usb0` | works |
 | NFC | `/dev/nq-nci` | present, chip driver `NFC_NQ` |
