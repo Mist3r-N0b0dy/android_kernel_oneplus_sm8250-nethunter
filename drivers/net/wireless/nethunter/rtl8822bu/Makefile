@@ -35,7 +35,7 @@ ccflags-y += -Wno-address
 ccflags-y += -Wframe-larger-than=1648
 
 # gcc-13
-ccflags-y += -Wno-stringop-overread
+ccflags-y += 
 ccflags-y += -Wno-enum-conversion
 ccflags-y += -Wno-int-in-bool-context
 
@@ -1358,10 +1358,10 @@ ifeq ($(CONFIG_MP_VHT_HW_TX_MODE), y)
 ccflags-y += -DCONFIG_MP_VHT_HW_TX_MODE
 ifeq ($(CONFIG_PLATFORM_I386_PC), y)
 ## For I386 X86 ToolChain use Hardware FLOATING
-ccflags-y += -mhard-float
+#ccflags-y += -mhard-float
 else
 ## For ARM ToolChain use Hardware FLOATING
-ccflags-y += -mfloat-abi=hard
+#ccflags-y += -mfloat-abi=hard
 endif
 endif
 
@@ -1437,7 +1437,7 @@ ccflags-y += -DCONFIG_P2P_IPS -DCONFIG_PLATFORM_ANDROID
 # Enable this for Android 5.0
 ccflags-y += -DCONFIG_RADIO_WORK
 ccflags-y += -DRTW_VENDOR_EXT_SUPPORT
-ccflags-y += -DRTW_ENABLE_WIFI_CONTROL_FUNC
+ccflags-y += 
 ARCH ?= arm
 
 CROSS_COMPILE := /mnt/newdisk/android_sdk/nvidia_tk1/android_L/prebuilts/gcc/linux-x86/arm/arm-eabi-4.8/bin/arm-eabi-
@@ -1474,7 +1474,7 @@ endif
 
 ifeq ($(CONFIG_PLATFORM_ACTIONS_ATM705X), y)
 ccflags-y += -DCONFIG_LITTLE_ENDIAN
-#ccflags-y += -DRTW_ENABLE_WIFI_CONTROL_FUNC
+#ccflags-y += 
 # default setting for Android 4.1, 4.2, 4.3, 4.4
 ccflags-y += -DCONFIG_PLATFORM_ACTIONS_ATM705X
 ccflags-y += -DCONFIG_CONCURRENT_MODE
@@ -1723,7 +1723,7 @@ endif
 ifeq ($(CONFIG_PLATFORM_TEGRA3_CARDHU), y)
 ccflags-y += -DCONFIG_LITTLE_ENDIAN
 # default setting for Android 4.1, 4.2
-ccflags-y += -DRTW_ENABLE_WIFI_CONTROL_FUNC
+ccflags-y += 
 ccflags-y += -DCONFIG_CONCURRENT_MODE
 ccflags-y += -DCONFIG_IOCTL_CFG80211 -DRTW_USE_CFG80211_STA_EVENT
 ARCH := arm
@@ -1735,7 +1735,7 @@ endif
 ifeq ($(CONFIG_PLATFORM_TEGRA4_DALMORE), y)
 ccflags-y += -DCONFIG_LITTLE_ENDIAN
 # default setting for Android 4.1, 4.2
-ccflags-y += -DRTW_ENABLE_WIFI_CONTROL_FUNC
+ccflags-y += 
 ccflags-y += -DCONFIG_CONCURRENT_MODE
 ccflags-y += -DCONFIG_IOCTL_CFG80211 -DRTW_USE_CFG80211_STA_EVENT
 ARCH := arm
@@ -1785,7 +1785,7 @@ ccflags-y += -DCONFIG_LITTLE_ENDIAN -DCONFIG_PLATFORM_ANDROID -DCONFIG_PLATFORM_
 ccflags-y += -DCONFIG_IOCTL_CFG80211 -DRTW_USE_CFG80211_STA_EVENT
 ccflags-y += -DCONFIG_CONCURRENT_MODE
 # default setting for Power control
-ccflags-y += -DRTW_ENABLE_WIFI_CONTROL_FUNC
+ccflags-y += 
 ifeq ($(CONFIG_SDIO_HCI), y)
 ccflags-y += -DRTW_SUPPORT_PLATFORM_SHUTDOWN
 endif
@@ -1798,7 +1798,7 @@ endif
 
 ifeq ($(CONFIG_PLATFORM_ARM_RK3066), y)
 ccflags-y += -DCONFIG_PLATFORM_ARM_RK3066
-ccflags-y += -DRTW_ENABLE_WIFI_CONTROL_FUNC
+ccflags-y += 
 ccflags-y += -DCONFIG_LITTLE_ENDIAN
 ccflags-y += -DCONFIG_CONCURRENT_MODE
 ccflags-y += -DCONFIG_IOCTL_CFG80211

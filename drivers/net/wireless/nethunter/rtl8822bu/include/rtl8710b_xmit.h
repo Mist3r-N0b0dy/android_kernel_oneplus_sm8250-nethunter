@@ -501,7 +501,7 @@ void fill_txdesc_bmc_tx_rate(struct pkt_attrib *pattrib, u8 *ptxdesc);
 	s32 rtl8710bu_hal_mgmt_xmitframe_enqueue(_adapter *padapter, struct xmit_frame *pxmitframe);
 #endif
 	s32	 rtl8710bu_hal_xmitframe_enqueue(_adapter *padapter, struct xmit_frame *pxmitframe);
-	void rtl8710bu_xmit_tasklet(void *priv);
+	void rtl8710bu_xmit_tasklet(unsigned long priv);
 	s32 rtl8710bu_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf);
 	void _dbg_dump_tx_info(_adapter	*padapter, int frame_tag, struct tx_desc *ptxdesc);
 #endif
@@ -514,7 +514,7 @@ void fill_txdesc_bmc_tx_rate(struct pkt_attrib *pattrib, u8 *ptxdesc);
 	s32 rtl8710be_hal_xmit(PADAPTER padapter, struct xmit_frame *pxmitframe);
 	s32 rtl8710be_mgnt_xmit(PADAPTER padapter, struct xmit_frame *pmgntframe);
 	s32	rtl8710be_hal_xmitframe_enqueue(_adapter *padapter, struct xmit_frame *pxmitframe);
-	void rtl8710be_xmit_tasklet(void *priv);
+	void rtl8710be_xmit_tasklet(unsigned long priv);
 #endif
 
 u8	BWMapping_8710B(PADAPTER Adapter, struct pkt_attrib *pattrib);

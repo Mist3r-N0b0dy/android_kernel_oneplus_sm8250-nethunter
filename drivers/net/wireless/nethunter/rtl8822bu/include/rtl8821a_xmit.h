@@ -158,7 +158,7 @@ s32 rtl8821au_hal_xmit(PADAPTER padapter, struct xmit_frame *pxmitframe);
 s32 rtl8821au_mgnt_xmit(PADAPTER padapter, struct xmit_frame *pmgntframe);
 s32 rtl8821au_hal_xmitframe_enqueue(PADAPTER padapter, struct xmit_frame *pxmitframe);
 s32 rtl8821au_xmit_buf_handler(PADAPTER padapter);
-void rtl8821au_xmit_tasklet(void *priv);
+void rtl8821au_xmit_tasklet(unsigned long priv);
 s32 rtl8821au_xmitframe_complete(PADAPTER padapter, struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf);
 #endif /* CONFIG_USB_HCI */
 
@@ -169,7 +169,7 @@ struct xmit_buf *rtl8821e_dequeue_xmitbuf(struct rtw_tx_ring *ring);
 void rtl8821e_xmitframe_resume(PADAPTER padapter);
 s32 rtl8821e_hal_xmit(PADAPTER padapter, struct xmit_frame *pxmitframe);
 s32 rtl8821e_mgnt_xmit(PADAPTER padapter, struct xmit_frame *pmgntframe);
-void rtl8821e_xmit_tasklet(void *priv);
+void rtl8821e_xmit_tasklet(unsigned long priv);
 #endif /* CONFIG_PCI_HCI */
 #endif
 
