@@ -504,9 +504,12 @@ int rtw_nm = 1;/*noise monitor*/
 module_param(rtw_nm, int, 0644);
 #endif
 
-char *ifname = "wlan%d";
-module_param(ifname, charp, 0644);
-MODULE_PARM_DESC(ifname, "The default name to allocate for first interface");
+/* net-hunter: 88XXau defines the same global. Both drivers live in the same
+ * vmlinux here (no modules), so this one is renamed to keep the link unique.
+ */
+char *rtl8822bu_ifname = "wlan%d";
+module_param(rtl8822bu_ifname, charp, 0644);
+MODULE_PARM_DESC(rtl8822bu_ifname, "The default name to allocate for first interface");
 
 #ifdef CONFIG_PLATFORM_ANDROID
 	char *if2name = "p2p%d";
@@ -1409,7 +1412,7 @@ uint loadparam(_adapter *padapter)
 	registry_par->enable80211d = (u8)rtw_80211d;
 #endif
 
-	snprintf(registry_par->ifname, 16, "%s", ifname);
+	snprintf(registry_par->ifname, 16, "%s", rtl8822bu_ifname);
 	snprintf(registry_par->if2name, 16, "%s", if2name);
 
 	registry_par->notch_filter = (u8)rtw_notch_filter;

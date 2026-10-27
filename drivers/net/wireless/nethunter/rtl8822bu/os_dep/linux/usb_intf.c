@@ -879,8 +879,8 @@ static void process_spec_devid(const struct usb_device_id *pdid)
 		/* Change the ifname to wlan10 when PC side WFD dongle plugin on DMP platform. */
 		/* It is used to distinguish between normal and PC-side wifi dongle/module. */
 		if ((pdid->idVendor == vid) && (pdid->idProduct == pid) && (flags & SPEC_DEV_ID_ASSIGN_IFNAME)) {
-			extern char *ifname;
-			strncpy(ifname, "wlan10", 6);
+			extern char *rtl8822bu_ifname;
+			strncpy(rtl8822bu_ifname, "wlan10", 6);
 			/* RTW_INFO("%s()-%d: ifname=%s, vid=%04X, pid=%04X\n", __FUNCTION__, __LINE__, ifname, vid, pid); */
 		}
 #endif /* RTK_DMP_PLATFORM */
