@@ -766,7 +766,7 @@ void usb_recv_tasklet(void *priv)
 	}
 }
 
-void usb_read_port_complete(struct urb *purb, struct pt_regs *regs)
+void nh88x2bu_usb_read_port_complete(struct urb *purb, struct pt_regs *regs)
 {
 	struct recv_buf	*precvbuf = (struct recv_buf *)purb->context;
 	_adapter			*padapter = (_adapter *)precvbuf->adapter;
@@ -799,7 +799,7 @@ void usb_read_port_complete(struct urb *purb, struct pt_regs *regs)
 		}
 	} else {
 
-		RTW_INFO("###=> usb_read_port_complete => urb.status(%d)\n", purb->status);
+		RTW_INFO("###=> nh88x2bu_usb_read_port_complete => urb.status(%d)\n", purb->status);
 
 		if (rtw_inc_and_chk_continual_io_error(adapter_to_dvobj(padapter)) == _TRUE)
 			rtw_set_surprise_removed(padapter);
@@ -865,7 +865,7 @@ u32 usb_read_port(struct intf_hdl *pintfhdl, u32 addr, u32 cnt, u8 *rmem)
 		usb_fill_bulk_urb(purb, pusbd, pipe,
 			precvbuf->pbuf,
 			MAX_RECVBUF_SZ,
-			usb_read_port_complete,
+			nh88x2bu_usb_read_port_complete,
 			precvbuf);/* context is precvbuf */
 
 		purb->transfer_dma = precvbuf->dma_transfer_addr;
@@ -919,7 +919,7 @@ void usb_recv_tasklet(void *priv)
 	}
 }
 
-void usb_read_port_complete(struct urb *purb, struct pt_regs *regs)
+void nh88x2bu_usb_read_port_complete(struct urb *purb, struct pt_regs *regs)
 {
 	struct recv_buf	*precvbuf = (struct recv_buf *)purb->context;
 	_adapter			*padapter = (_adapter *)precvbuf->adapter;
@@ -958,7 +958,7 @@ void usb_read_port_complete(struct urb *purb, struct pt_regs *regs)
 		}
 	} else {
 
-		RTW_INFO("###=> usb_read_port_complete => urb.status(%d)\n", purb->status);
+		RTW_INFO("###=> nh88x2bu_usb_read_port_complete => urb.status(%d)\n", purb->status);
 
 		if (rtw_inc_and_chk_continual_io_error(adapter_to_dvobj(padapter)) == _TRUE)
 			rtw_set_surprise_removed(padapter);
@@ -1055,7 +1055,7 @@ recv_buf_hook:
 	usb_fill_bulk_urb(purb, pusbd, pipe,
 		precvbuf->pbuf,
 		MAX_RECVBUF_SZ,
-		usb_read_port_complete,
+		nh88x2bu_usb_read_port_complete,
 		precvbuf);
 
 	err = usb_submit_urb(purb, GFP_ATOMIC);

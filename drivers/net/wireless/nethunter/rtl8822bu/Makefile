@@ -47,7 +47,7 @@ ifeq ($(GCC_VER_49),1)
 ccflags-y += -Wno-date-time	# Fix compile error && warning on gcc 4.9 and later
 endif
 
-ccflags-y += -I$(src)/include
+ccflags-y += -I$(srctree)/$(src)/include
 
 ldflags-y += --strip-debug
 
@@ -330,10 +330,10 @@ _HAL_INTFS_FILES :=	hal/hal_intf.o \
 			hal/led/hal_$(HCI_NAME)_led.o
 
 
-ccflags-y += -I$(src)/platform
+ccflags-y += -I$(srctree)/$(src)/platform
 _PLATFORM_FILES := platform/platform_ops.o
 
-ccflags-y += -I$(src)/hal/btc
+ccflags-y += -I$(srctree)/$(src)/hal/btc
 
 ########### HAL_RTL8188E #################################
 ifeq ($(CONFIG_RTL8188E), y)
@@ -2427,31 +2427,31 @@ ccflags-y += -DRTW_USB_HAS_DRVWRAP
 endif
 
 ########### this part for *.mk ############################
-include $(src)/hal/phydm/phydm.mk
+include $(srctree)/$(src)/hal/phydm/phydm.mk
 
 ########### HAL_RTL8822B #################################
 ifeq ($(CONFIG_RTL8822B), y)
-include $(src)/rtl8822b.mk
+include $(srctree)/$(src)/rtl8822b.mk
 endif
 
 ########### HAL_RTL8821C #################################
 ifeq ($(CONFIG_RTL8821C), y)
-include $(src)/rtl8821c.mk
+include $(srctree)/$(src)/rtl8821c.mk
 endif
 
 ########### HAL_RTL8822C #################################
 ifeq ($(CONFIG_RTL8822C), y)
-include $(src)/rtl8822c.mk
+include $(srctree)/$(src)/rtl8822c.mk
 endif
 
 ########### HAL_RTL8814B #################################
 ifeq ($(CONFIG_RTL8814B), y)
-include $(src)/rtl8814b.mk
+include $(srctree)/$(src)/rtl8814b.mk
 endif
 
 ########### HAL_RTL8723F #################################
 ifeq ($(CONFIG_RTL8723F), y)
-include $(src)/rtl8723f.mk
+include $(srctree)/$(src)/rtl8723f.mk
 endif
 
 rtk_core :=	core/rtw_cmd.o \
@@ -2501,7 +2501,7 @@ ifeq ($(CONFIG_SDIO_HCI), y)
 rtk_core += core/rtw_sdio.o
 endif
 
-ccflags-y += -I$(src)/core/crypto
+ccflags-y += -I$(srctree)/$(src)/core/crypto
 rtk_core += \
 		core/crypto/aes-internal.o \
 		core/crypto/aes-internal-enc.o \
@@ -2621,3 +2621,13 @@ clean:
 	rm -fr .tmp_versions
 	rm -fr MOK.der MOK.priv
 endif
+
+# --- v1.6, added by patches/nethunter-vendor-realtek.sh ----------------------
+# This driver defines 2625 globals that the 88XXau driver also defines. Built as
+# modules the two never share a namespace; linked into vmlinux they do. The
+# header renames every global of this driver to a rtl8822bu_-prefixed one, in
+# the preprocessor, for the whole directory at once: definitions and uses
+# together, so the code is unchanged, only the names.
+# It cannot be done with objcopy: CONFIG_LTO_CLANG turns the .o into bitcode,
+# where objcopy --prefix-symbols has nothing to act on.
+ccflags-y += -include $(srctree)/drivers/net/wireless/nethunter/rtl8822bu-prefix.h

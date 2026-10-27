@@ -1,0 +1,30 @@
+# v1.6 -- the two out-of-tree Realtek drivers, vendored into the tree.
+#
+# The symbol names below are NOT free: both vendor Makefiles end with
+#     obj-$(CONFIG_RTL8822BU) := $(MODULE_NAME).o
+# and the same for CONFIG_88XXAU. kbuild imports every CONFIG_ from auto.conf
+# into make, so declaring the very same names here is enough to turn those lines
+# into obj-y: the vendor Makefiles are used verbatim, not one line edited.
+#
+# They stay tristate on purpose. v1.6 builds them in, but =m remains reachable
+# for a debugging build, and Kconfig will not let =y through unless every
+# dependency is =y, which is the check we want.
+
+config 88XXAU
+	tristate "Realtek RTL8812AU/RTL8821AU USB WiFi (injection)"
+	depends on WLAN && USB && CFG80211
+	help
+	  aircrack-ng fork of the Realtek RTL8812AU driver, with the monitor mode
+	  and frame injection patches. This is the driver behind the TP-Link
+	  Archer T2U Plus (2357:0120) and every other 8812AU/8821AU adapter.
+	  Vendored into drivers/net/wireless/nethunter/ by the build: it defines
+	  2625 globals that the 8822BU driver also defines, so it is compiled with
+	  a symbol prefix header -- see rtl8822bu-prefix.h.
+
+config RTL8822BU
+	tristate "Realtek RTL8822BU USB WiFi (injection)"
+	depends on WLAN && USB && CFG80211
+	help
+	  morrownr fork of the Realtek RTL8822BU driver, with injection and the
+	  CFI fixes. This is the driver behind the Linksys WUSB6400M
+	  (13b1:0043). Its globals are prefixed rtl8822bu_ by the build.

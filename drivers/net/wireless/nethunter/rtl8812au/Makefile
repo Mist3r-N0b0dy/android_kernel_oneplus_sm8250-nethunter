@@ -19,8 +19,8 @@ EXTRA_CFLAGS += -Wno-unknown-pragmas
 EXTRA_CFLAGS += -Wno-address
 EXTRA_CFLAGS += -Wno-vla -g
 
-EXTRA_CFLAGS += -I$(src)/include -I$(srctree)/$(src)/include
-EXTRA_CFLAGS += -I$(src)/hal/phydm -I$(srctree)/$(src)/hal/phydm
+EXTRA_CFLAGS += -I$(srctree)/$(src)/include -I$(srctree)/$(src)/include
+EXTRA_CFLAGS += -I$(srctree)/$(src)/hal/phydm -I$(srctree)/$(src)/hal/phydm
 EXTRA_LDFLAGS += --strip-debug -O3
 
 ########################## WIFI IC ############################
@@ -230,10 +230,10 @@ _HAL_INTFS_FILES :=	hal/hal_intf.o \
 			hal/led/hal_$(HCI_NAME)_led.o
 
 
-EXTRA_CFLAGS += -I$(src)/platform -I$(srctree)/$(src)/platform
+EXTRA_CFLAGS += -I$(srctree)/$(src)/platform -I$(srctree)/$(src)/platform
 _PLATFORM_FILES := platform/platform_ops.o
 
-EXTRA_CFLAGS += -I$(src)/hal/btc -I$(srctree)/$(src)/hal/btc
+EXTRA_CFLAGS += -I$(srctree)/$(src)/hal/btc -I$(srctree)/$(src)/hal/btc
 
 
 ########### HAL_RTL8812A_RTL8821A #################################
@@ -1661,7 +1661,7 @@ endif
 ifneq ($(KERNELRELEASE),)
 
 ########### this part for *.mk ############################
-include $(src)/hal/phydm/phydm.mk
+include $(srctree)/$(src)/hal/phydm/phydm.mk
 
 rtk_core :=	core/rtw_cmd.o \
 		core/rtw_security.o \
