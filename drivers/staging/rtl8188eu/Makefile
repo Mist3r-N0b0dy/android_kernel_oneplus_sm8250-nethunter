@@ -1,4 +1,15 @@
 # SPDX-License-Identifier: GPL-2.0
+#
+# -Werror is ON for the whole tree (CONFIG_CC_WERROR=y). This staging driver
+# cannot be made warning-free without rewriting vendor code: 5
+# logical-not-parentheses (`!memcmp(..) == false`), 2 parentheses-equality,
+# 1 enum-conversion, 6 unused-variable. Those four classes -- and only those --
+# are downgraded to warnings here. They still print in the log.
+subdir-ccflags-y += -Wno-error=unused-variable
+subdir-ccflags-y += -Wno-error=parentheses-equality
+subdir-ccflags-y += -Wno-error=logical-not-parentheses
+subdir-ccflags-y += -Wno-error=enum-conversion
+
 r8188eu-y :=				\
 		core/rtw_ap.o		\
 		core/rtw_cmd.o		\
@@ -56,7 +67,7 @@ obj-$(CONFIG_R8188EU)	:= r8188eu.o
 
 ccflags-y += -I$(srctree)/$(src)/include
 
-# --- v1.6, added by patches/r8188eu-allow-builtin.sh ------------------------
+# --- v1.6: this driver shares globals with rtlwifi, in the same image --------
 # This driver is a fork of drivers/net/wireless/realtek/rtlwifi, which is built
 # into the same image: without this header the link stops on a duplicate symbol
 # (efuse_power_switch and the rest). The header renames every global of this

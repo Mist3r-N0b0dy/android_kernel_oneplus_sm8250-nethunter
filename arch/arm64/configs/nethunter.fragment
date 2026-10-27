@@ -1,0 +1,340 @@
+# =============================================================================
+#  v1.5 policy: everything that lives in this kernel tree is BUILT IN (=y).
+#  Only the two out-of-tree drivers (88XXau, 88x2bu) stay modules, because they
+#  are vendored sources rebuilt outside the kernel, and because rmmod is the
+#  rescue when one of them wedges an adapter in monitor mode.
+#
+#  Why: with CONFIG_MODVERSIONS off, vermagic is the only compatibility check
+#  and LOCALVERSION does not move between builds, so a stale .ko from an
+#  earlier build loads into a newer kernel silently. Building in removes that
+#  failure mode, makes a kernel flash self-sufficient (no service.sh, no load
+#  order, no insmod timing) and lets request_module() find the driver without a
+#  module path. Cost, measured after stripping the debug info: 5.5 MiB of image
+#  for the 72 in-tree modules (see docs/module-audit.md).
+# =============================================================================
+# NetHunter kernel feature set — OnePlus 8T (kebab), msm-4.19 / Android 17
+#
+# Merged over arch/arm64/configs/vendor/kona-perf_defconfig + oplus.config,
+# then olddefconfig runs. build.sh checks EVERY line below against out/.config:
+# a symbol whose dependency is missing is dropped SILENTLY by olddefconfig, and
+# that is exactly how v1.0 shipped eight Wi-Fi drivers that no .ko ever backed.
+#
+# Rule for this file: one symbol per line, no wildcards, no comments inside a
+# block, and the value written here is the value that must appear in out/.config.
+
+# --- 802.11 core: monitor mode, injection, mesh, wext ------------------------
+CONFIG_MAC80211=y
+CONFIG_MAC80211_MESH=y
+CONFIG_MAC80211_RC_MINSTREL=y
+CONFIG_MAC80211_RC_DEFAULT_MINSTREL=y
+CONFIG_CFG80211=y
+CONFIG_CFG80211_WEXT=y
+CONFIG_WIRELESS_EXT=y
+CONFIG_WEXT_CORE=y
+CONFIG_WEXT_PROC=y
+CONFIG_WEXT_PRIV=y
+CONFIG_RFKILL=y
+
+# --- USB Wi-Fi adapters (in-tree, shipped as .ko) ----------------------------
+# ATH9K_HTC collides with the vendor's qca-wifi-host-cmn when linked in:
+# ath9k_htc defines htc_start / htc_stop / htc_connect_service, and so does
+# drivers/staging/qca-wifi-host-cmn/htc/htc_services.o. As modules the two sets
+# never meet; in vmlinux they do:
+#   ld.lld: error: duplicate symbol: htc_start
+#   >>> defined in .../qca-wifi-host-cmn/htc/htc_services.o
+# v1.6 solves it at the source instead of dodging it: the three ath9k_htc
+# copies are renamed in the vendored source itself (nothing else uses them, they
+# are not EXPORT_SYMBOL, and the whole surface is five files in ath9k/).
+# ath9k_hw and ath9k_common follow ATH9K_HTC in mode, so =y is enough here.
+CONFIG_ATH9K_HTC=y
+CONFIG_CARL9170=y
+CONFIG_MT7601U=y
+CONFIG_MT76x2U=y
+CONFIG_RTL8187=y
+CONFIG_RTL8192CU=y
+CONFIG_RTL8XXXU=y
+
+# --- v1.6: the two injection drivers, built into the image -------------------
+# These two used to be built out of tree (make M=) and shipped as .ko, because
+# an out-of-tree module can never be linked into vmlinux. Their sources are now
+# committed under drivers/net/wireless/nethunter/ and built by the kernel's own
+# kbuild. Both must be declared =y here AND their Kconfig entries must exist:
+# olddefconfig drops a symbol no Kconfig declares, in silence. The entries live
+# in drivers/net/wireless/nethunter/Kconfig, sourced from
+# drivers/net/wireless/Kconfig. The 2625 globals the two drivers share are
+# handled in the preprocessor -- see .../nethunter/rtl8822bu-prefix.h.
+CONFIG_88XXAU=y
+CONFIG_RTL8822BU=y
+# R8188EU used to be impossible to build in: drivers/staging/rtl8188eu/Kconfig
+# carried `depends on m`, which caps the symbol at m and makes olddefconfig drop
+# any CONFIG_R8188EU=y without a word. v1.6 removes that one line in the Kconfig
+# itself, so =y now works. LIB80211 and its two
+# crypt modules follow through the select lines in the same Kconfig: written
+# here they would be dropped, exactly like CONFIG_SLHC.
+CONFIG_R8188EU=y
+CONFIG_ZD1211RW=y
+CONFIG_RT2X00=y
+CONFIG_RT2500USB=y
+CONFIG_RT73USB=y
+CONFIG_RT2800USB=y
+CONFIG_RSI_91X=y
+CONFIG_RSI_USB=y
+CONFIG_RSI_COEX=y
+
+# Prism54 USB (p54usb): isl38xx adapters, monitor mode supported. P54_COMMON
+# first -- P54_USB depends on it and would be dropped in silence without it.
+# Runtime needs the isl3887usb firmware, which the ROM ships.
+CONFIG_P54_COMMON=y
+CONFIG_P54_USB=y
+
+# Leaf libraries the Wi-Fi modules above depend on. =y since the v1.4 payload
+# audit: 37 KiB + 60 KiB, a single consumer each, and a missing one fails as
+# "Unknown symbol crc_itu_t" at load time rather than at build time.
+CONFIG_CRC_ITU_T=y
+CONFIG_EEPROM_93CX6=y
+
+# mt76x0 (MT7610U) is absent on purpose: enabling it makes the shared mt76 core
+# keep __compiletime_assert_* symbols in ThinLTO, and modpost refuses to link
+# mt76x0.ko ("ERROR: __compiletime_assert_233 ... undefined!"). mt76x2u (MT7612U)
+# is unaffected and stays.
+
+# --- Bluetooth: dongles, serial HCI, BT HID, PAN, tethering ------------------
+CONFIG_BT=y
+CONFIG_BT_RFCOMM=y
+CONFIG_BT_RFCOMM_TTY=y
+CONFIG_BT_BNEP=y
+CONFIG_BT_HIDP=y
+CONFIG_BT_HCIBTUSB=y
+CONFIG_SERIAL_DEV_BUS=y
+CONFIG_BT_HCIUART=y
+CONFIG_BT_HCIUART_SERDEV=y
+CONFIG_BT_HCIUART_H4=y
+CONFIG_BT_HCIUART_BCM=y
+CONFIG_BT_HCIUART_INTEL=y
+
+# --- HID: BadUSB / HID attacks / raw devices ---------------------------------
+CONFIG_HID=y
+CONFIG_HID_GENERIC=y
+CONFIG_USB_HID=y
+CONFIG_HIDRAW=y
+CONFIG_UHID=y
+CONFIG_USB_CONFIGFS_F_HID=y
+CONFIG_USB_F_HID=y
+
+# --- USB gadget: RNDIS/ECM/EEM/MTP + ACM serial ------------------------------
+CONFIG_USB_CONFIGFS=y
+CONFIG_USB_CONFIGFS_F_FS=y
+CONFIG_USB_CONFIGFS_RNDIS=y
+CONFIG_USB_CONFIGFS_ECM=y
+CONFIG_USB_CONFIGFS_EEM=y
+CONFIG_USB_ACM=y
+
+# --- USB serial: GPS, 3G modems, Arduino, CAN bridges -----------------------
+CONFIG_USB_SERIAL=y
+CONFIG_USB_SERIAL_PL2303=y
+CONFIG_USB_SERIAL_CP210X=y
+CONFIG_USB_SERIAL_CH341=y
+CONFIG_USB_SERIAL_FTDI_SIO=y
+CONFIG_USB_SERIAL_OPTION=y
+CONFIG_USB_SERIAL_MCT_U232=y
+CONFIG_USB_SERIAL_ARK3116=y
+CONFIG_USB_SERIAL_BELKIN=y
+CONFIG_USB_SERIAL_IPW=y
+CONFIG_USB_SERIAL_IUU=y
+CONFIG_USB_SERIAL_KEYSPAN=y
+CONFIG_USB_SERIAL_MOS7720=y
+CONFIG_USB_SERIAL_MOS7840=y
+CONFIG_USB_SERIAL_OTI6858=y
+CONFIG_USB_SERIAL_SPCP8X5=y
+CONFIG_USB_SERIAL_WHITEHEAT=y
+CONFIG_USB_SERIAL_F81232=y
+
+# --- USB ethernet ------------------------------------------------------------
+CONFIG_USB_NET_CDCETHER=y
+CONFIG_USB_NET_RNDIS_HOST=y
+CONFIG_USB_NET_AX8817X=y
+CONFIG_USB_NET_AX88179_178A=y
+
+# --- USB storage: UAS (Samsung T7 and other UAS-capable bridges) ------------
+# =y, decided by measurement on 2026-10-23, same USB-C 4.0 cable, 5 GiB file,
+# same protocol for both: bs=8M buffered + fsync on write, iflag=direct on read.
+#   BOT (v1.2):  261 MiB/s write, 549 MiB/s read, nr_requests=2, rotational=1
+#   UAS (v1.3):  364 MiB/s write, 772 MiB/s read, nr_requests=60, rotational=0
+#   -> +39% write, +41% read, integrity checked (md5 of 5 GiB of zeros)
+# With uas built in, the .ko disappears from the drivers payload and uas takes
+# the interface from probe, with no service.sh timing involved (see v1.3 where
+# =m meant that usb-storage refuses UAS devices until uas.ko is loaded).
+# LOCALVERSION is untouched: the vermagic does not move, every other .ko stays
+# valid as built.
+CONFIG_USB_UAS=y
+
+# --- CAN bus (SocketCAN, candump/cansniffer, USB-CAN bridges) ---------------
+CONFIG_CAN=y
+CONFIG_CAN_RAW=y
+CONFIG_CAN_BCM=y
+CONFIG_CAN_GW=y
+CONFIG_CAN_VCAN=y
+CONFIG_CAN_SLCAN=y
+CONFIG_CAN_GS_USB=y
+
+# --- NFS / CIFS / file sharing ----------------------------------------------
+CONFIG_NFS_FS=y
+CONFIG_NFS_V3=y
+CONFIG_NFS_V4=y
+CONFIG_NFSD=y
+CONFIG_CIFS=y
+
+# --- Containers (docker / podman inside the chroot) --------------------------
+CONFIG_USER_NS=y
+CONFIG_PID_NS=y
+CONFIG_IPC_NS=y
+CONFIG_SYSVIPC=y
+CONFIG_POSIX_MQUEUE=y
+CONFIG_CGROUPS=y
+CONFIG_MEMCG=y
+CONFIG_CGROUP_PIDS=y
+CONFIG_CGROUP_DEVICE=y
+CONFIG_BLK_CGROUP=y
+CONFIG_CGROUP_NET_PRIO=y
+CONFIG_OVERLAY_FS=y
+CONFIG_VETH=y
+CONFIG_BRIDGE=y
+CONFIG_BRIDGE_NETFILTER=y
+CONFIG_MACVLAN=y
+CONFIG_VXLAN=y
+CONFIG_DUMMY=y
+CONFIG_NET_NS=y
+
+# --- NAT / redirection: mitm, transparent proxy, tethering ------------------
+CONFIG_NF_NAT=y
+CONFIG_IP_NF_NAT=y
+CONFIG_IP_NF_TARGET_MASQUERADE=y
+CONFIG_IP6_NF_NAT=y
+CONFIG_IP6_NF_TARGET_MASQUERADE=y
+CONFIG_NETFILTER_XT_TARGET_REDIRECT=y
+CONFIG_NETFILTER_XT_TARGET_NETMAP=y
+CONFIG_NETFILTER_XT_TARGET_TPROXY=y
+CONFIG_NETFILTER_XT_TARGET_CT=y
+CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
+# --- nftables: =y and COMPLETE, or nothing (v1.4) ---------------------------
+# Until v1.4 this was CONFIG_NF_TABLES=m with NF_TABLES_IPV4/INET/IPV6/ARP/
+# BRIDGE all "not set" and every NFT_* expression off. Measured on the device:
+#     # nft add table ip t
+#     Error: Could not process rule: Operation not supported
+# so 5.1 MiB of .ko were loaded for a tool that could not create a single
+# table. Kali ships nft 1.1.7 in the chroot, and Debian's default iptables is
+# nft-backed (this image pins it to iptables-legacy, see update-alternatives).
+# Keeping the option =m without the families was the worst of both worlds.
+# All built in: the code is a few hundred KiB, and a family module that is
+# absent turns every rule into "Operation not supported".
+CONFIG_NF_TABLES=y
+CONFIG_NF_TABLES_INET=y
+CONFIG_NF_TABLES_IPV4=y
+CONFIG_NF_TABLES_IPV6=y
+CONFIG_NF_TABLES_ARP=y
+CONFIG_NF_TABLES_NETDEV=y
+# expressions: the ones a normal rule set needs. Each extra one is code that
+# has to be justified; NFT_OSF, NFT_SOCKET, NFT_SYNPROXY, NFT_NUMGEN and the
+# NFT_FIB_*/NFT_DUP family are deliberately left out.
+CONFIG_NFT_CT=y
+CONFIG_NFT_COUNTER=y
+CONFIG_NFT_LOG=y
+CONFIG_NFT_LIMIT=y
+CONFIG_NFT_QUOTA=y
+CONFIG_NFT_NAT=y
+CONFIG_NFT_MASQ=y
+CONFIG_NFT_REDIR=y
+CONFIG_NFT_REJECT=y
+CONFIG_NFT_QUEUE=y
+CONFIG_NFT_TUNNEL=y
+CONFIG_NFT_OBJREF=y
+CONFIG_NFT_HASH=y
+# NFT_COMPAT translates the old iptables syntax, so iptables-nft works when
+# something switches the alternatives away from legacy.
+CONFIG_NFT_COMPAT=y
+
+# --- PPP / VPN transports ----------------------------------------------------
+CONFIG_PPP=y
+# SLHC is NOT set here: it is a promptless tristate in drivers/net/slip/Kconfig,
+# selected by PPP/SLIP/ISDN. Writing CONFIG_SLHC=y has no effect at all --
+# olddefconfig drops the line and the build reports "absent du .config"
+# (measured, 2026-10-23). It follows PPP: =m as long as PPP is =m.
+CONFIG_PPP_ASYNC=y
+CONFIG_PPP_SYNC_TTY=y
+CONFIG_PPP_DEFLATE=y
+CONFIG_PPP_BSDCOMP=y
+CONFIG_PPP_MPPE=y
+CONFIG_PPPOE=y
+
+# --- SDR: RTL2832U (rtl_sdr, gqrx), DVB-T dongles ---------------------------
+CONFIG_MEDIA_SUPPORT=y
+CONFIG_MEDIA_USB_SUPPORT=y
+CONFIG_MEDIA_DIGITAL_TV_SUPPORT=y
+CONFIG_MEDIA_SDR_SUPPORT=y
+CONFIG_DVB_CORE=y
+CONFIG_RC_CORE=y
+CONFIG_DVB_USB=y
+CONFIG_DVB_USB_V2=y
+CONFIG_DVB_USB_RTL28XXU=y
+CONFIG_DVB_RTL2832=y
+CONFIG_DVB_RTL2832_SDR=y
+
+# --- NFC: PN533 USB reader, NCI core, and the phone's own controller --------
+CONFIG_NFC=y
+# NCI core: the transport every Android NCI controller speaks, and what the
+# Kali nfcgid tooling talks to. NFC_NQ (the Qualcomm NQ driver this phone's
+# defconfig enables) exposes the chip itself; the two coexist.
+CONFIG_NFC_NCI=y
+CONFIG_NFC_NQ=y
+CONFIG_NFC_PN533=y
+CONFIG_NFC_PN533_USB=y
+
+# --- Misc: binfmt_misc (qemu-user), misc devices ----------------------------
+# KEXEC is deliberately absent: this vendor tree keeps the pre-5.0
+# cpu_soft_restart(phys_addr_t) in arch/arm64/mm/proc.S while machine_kexec.c
+# uses the mainline 4-argument API, and cpu-reset.h redefines the same symbol
+# as `static inline` -> the two cannot be linked together. Enabling it means
+# rewriting vendor assembly that nothing here can test.
+# =y since v1.4 (payload audit): this is what lets qemu-user run ARM/x86
+# binaries inside the chroot, and the registration has to exist before the
+# chroot's tooling touches /proc/sys/fs/binfmt_misc. As a module it only worked
+# because service.sh had already loaded it.
+CONFIG_BINFMT_MISC=y
+# -Werror, kept ON on purpose (the vendor defconfig sets it, we do not touch it).
+# Every warning in kernel code -- and every warning on a line we wrote -- is a
+# hard error here, so it cannot slip through unnoticed. The only exceptions are
+# four named diagnostic classes inside the two third-party driver trees, turned
+# back into warnings with -Wno-error= in their own Makefiles. They keep printing
+# in the build log: 500 of them on the current tree, all third-party code.
+CONFIG_CC_WERROR=y
+CONFIG_MODULE_FORCE_UNLOAD=y
+CONFIG_TUN=y
+CONFIG_I2C_CHARDEV=y
+CONFIG_SPI_SPIDEV=y
+CONFIG_GPIO_SYSFS=y
+
+# --- must be OFF (out-of-tree drivers are insmod'ed) ------------------------
+# CONFIG_MODULE_SIG is not set
+# CONFIG_MODVERSIONS is not set
+
+# --- the two .ko that come from the crDroid defconfig -----------------------
+# These two are not ours: they are =m in the vendor defconfig and our fragment
+# never spoke about them, which is how they survived the v1.5 "everything in
+# tree" sweep and shipped as the only unexplainable .ko of the payload.
+# v1.6 targets zero modules, so they are named here even though neither is ever
+# used: USB_GSPCA is the webcam framework (no webcam on a NetHunter phone) and
+# RSI_SDIO is the Redpine *SDIO* Wi-Fi driver (this board has no SDIO Wi-Fi).
+# They cost image space for nothing, but leaving them =m costs a module.
+CONFIG_USB_GSPCA=y
+CONFIG_RSI_SDIO=y
+
+# --- release string ----------------------------------------------------------
+# Set here, not by a build script: a clone of this fork must configure and name
+# itself with nothing but what is inside the tree. The hash is the upstream
+# commit this branch is based on; crDroid's own modules carry it in their
+# vermagic, so it is what makes the two agree.
+CONFIG_LOCALVERSION="-perf-g66e230426430-Mist3r_N0b0dy"
+# Without this, setlocalversion appends -dirty as soon as the build leaves a
+# tracked file modified, and every vermagic comparison fails for a reason that
+# has nothing to do with the kernel.
+# CONFIG_LOCALVERSION_AUTO is not set
