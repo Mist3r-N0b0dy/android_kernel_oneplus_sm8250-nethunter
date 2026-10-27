@@ -330,7 +330,7 @@ s32 rtl8812au_hal_xmit(PADAPTER padapter, struct xmit_frame *pxmitframe);
 s32 rtl8812au_mgnt_xmit(PADAPTER padapter, struct xmit_frame *pmgntframe);
 s32	 rtl8812au_hal_xmitframe_enqueue(_adapter *padapter, struct xmit_frame *pxmitframe);
 s32 rtl8812au_xmit_buf_handler(PADAPTER padapter);
-void rtl8812au_xmit_tasklet(void *priv);
+void rtl8812au_xmit_tasklet(unsigned long priv);
 s32 rtl8812au_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf);
 #endif
 
@@ -342,7 +342,7 @@ void	rtl8812ae_xmitframe_resume(_adapter *padapter);
 s32 rtl8812ae_hal_xmit(PADAPTER padapter, struct xmit_frame *pxmitframe);
 s32 rtl8812ae_mgnt_xmit(PADAPTER padapter, struct xmit_frame *pmgntframe);
 s32	rtl8812ae_hal_xmitframe_enqueue(_adapter *padapter, struct xmit_frame *pxmitframe);
-void rtl8812ae_xmit_tasklet(void *priv);
+void rtl8812ae_xmit_tasklet(unsigned long priv);
 
 #ifdef CONFIG_XMIT_THREAD_MODE
 s32 rtl8812ae_xmit_buf_handler(_adapter *padapter);

@@ -276,7 +276,7 @@ void fill_txdesc_bmc_tx_rate(struct pkt_attrib *pattrib, u8 *ptxdesc);
 	s32 rtl8814au_mgnt_xmit(PADAPTER padapter, struct xmit_frame *pmgntframe);
 	s32	 rtl8814au_hal_xmitframe_enqueue(_adapter *padapter, struct xmit_frame *pxmitframe);
 	s32 rtl8814au_xmit_buf_handler(PADAPTER padapter);
-	void rtl8814au_xmit_tasklet(void *priv);
+	void rtl8814au_xmit_tasklet(unsigned long priv);
 	s32 rtl8814au_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf);
 #endif /* CONFIG_USB_HCI */
 
@@ -288,7 +288,7 @@ void fill_txdesc_bmc_tx_rate(struct pkt_attrib *pattrib, u8 *ptxdesc);
 	s32 rtl8814ae_hal_xmit(PADAPTER padapter, struct xmit_frame *pxmitframe);
 	s32 rtl8814ae_mgnt_xmit(PADAPTER padapter, struct xmit_frame *pmgntframe);
 	s32	rtl8814ae_hal_xmitframe_enqueue(_adapter *padapter, struct xmit_frame *pxmitframe);
-	void rtl8814ae_xmit_tasklet(void *priv);
+	void rtl8814ae_xmit_tasklet(unsigned long priv);
 #ifdef CONFIG_XMIT_THREAD_MODE
 	s32 rtl8814ae_xmit_buf_handler(_adapter *padapter);
 #endif
