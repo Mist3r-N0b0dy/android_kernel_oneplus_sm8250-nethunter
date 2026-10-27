@@ -55,3 +55,11 @@ r8188eu-y :=				\
 obj-$(CONFIG_R8188EU)	:= r8188eu.o
 
 ccflags-y += -I$(srctree)/$(src)/include
+
+# --- v1.6, added by patches/r8188eu-allow-builtin.sh ------------------------
+# This driver is a fork of drivers/net/wireless/realtek/rtlwifi, which is built
+# into the same image: without this header the link stops on a duplicate symbol
+# (efuse_power_switch and the rest). The header renames every global of this
+# driver to an r8188eu_-prefixed one, in the preprocessor, for the whole
+# directory at once.
+ccflags-y += -include $(srctree)/drivers/staging/rtl8188eu/r8188eu-prefix.h
