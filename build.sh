@@ -53,6 +53,18 @@ done
 export KBUILD_BUILD_USER="${KBUILD_BUILD_USER:-Mist3r_N0b0dy}"
 export KBUILD_BUILD_HOST="${KBUILD_BUILD_HOST:-nethunter-op8t}"
 
+# ...and the release string must not depend on HOW the tree was obtained.
+# scripts/setlocalversion appends "+" whenever HEAD is not an exact tag match,
+# which is always true here: we carry commits on top of a crDroid merge and we
+# do not tag the tree before building. Building the same tree from a tarball
+# (not a git repo) or from a clone would then produce two different releases,
+# "-Mist3r_N0b0dy" and "-Mist3r_N0b0dy+", with two different vermagics. Setting
+# LOCALVERSION -- even to an empty string -- is the switch the script honours to
+# skip the scm suffix entirely, so the release is a property of the fragment
+# alone. Reproduced on the build host: a plain `make kernelrelease` in a clone
+# gives "...-Mist3r_N0b0dy+", this build gives "...-Mist3r_N0b0dy".
+export LOCALVERSION=
+
 say()  { printf '\n=== %s\n' "$*"; }
 warn() { printf '  !! %s\n' "$*" >&2; }
 die()  { printf '\nbuild.sh: %s\n' "$*" >&2; exit 1; }
@@ -124,10 +136,20 @@ mkdir -p "$OUT"
 # -DOPLUS_FEATURE_CHG_BASIC is injected for that file. The fragment carries
 # what the defconfig cannot: CFI/LTO knobs that depend on the host compiler,
 # the release string, and '# CONFIG_LOCALVERSION_AUTO is not set'.
-scripts/kconfig/merge_config.sh -m -O "$OUT" \
-  arch/arm64/configs/vendor/kona-perf_defconfig \
-  arch/arm64/configs/vendor/oplus.config \
-  arch/arm64/configs/nethunter.fragment > "$OUT/merge_config.log" 2>&1 ||
+# EXTRA_CONFIG is for debugging builds only: an extra kconfig fragment merged
+# LAST, so it wins over the fragment. Used to build a CFI-permissive kernel --
+# with CONFIG_CFI_PERMISSIVE=y a CFI violation is logged and the kernel keeps
+# running, which is the only way to learn which function trap when the strict
+# kernel freezes before it can write anything down.
+configs=(arch/arm64/configs/vendor/kona-perf_defconfig
+         arch/arm64/configs/vendor/oplus.config
+         arch/arm64/configs/nethunter.fragment)
+if [ -n "${EXTRA_CONFIG:-}" ]; then
+  [ -f "$EXTRA_CONFIG" ] || die "EXTRA_CONFIG=$EXTRA_CONFIG: no such file"
+  configs+=("$EXTRA_CONFIG")
+  echo "  extra      $EXTRA_CONFIG"
+fi
+scripts/kconfig/merge_config.sh -m -O "$OUT" "${configs[@]}" > "$OUT/merge_config.log" 2>&1 ||
   { tail -20 "$OUT/merge_config.log" >&2; die "merge_config failed"; }
 make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig > "$OUT/olddefconfig.log" 2>&1 ||
   { tail -20 "$OUT/olddefconfig.log" >&2; die "olddefconfig failed"; }
@@ -138,7 +160,8 @@ make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig > "$OUT/olddefconfig.log
 say "3/6 configuration checks"
 cfg="$OUT/.config"
 for opt in CONFIG_CFI_CLANG CONFIG_CFI_CLANG_SHADOW CONFIG_LTO_CLANG CONFIG_THINLTO \
-           CONFIG_88XXAU CONFIG_RTL8822BU CONFIG_P54_USB CONFIG_NFC_NCI; do
+           CONFIG_88XXAU CONFIG_RTL8822BU CONFIG_P54_USB CONFIG_NFC_NCI \
+           CONFIG_ATH6KL_USB CONFIG_MWIFIEX_USB; do
   grep -qE "^$opt=y" "$cfg" && echo "  $opt=y" ||
     die "$opt is not =y in $cfg -- wrong compiler? see the fragment's comment"
 done
@@ -188,4 +211,7 @@ if [ "$DO_ZIP" -eq 0 ]; then
   exit 0
 fi
 say "6/6 flashable zip"
-OUT="$OUT" DIST="$DIST" AK3="$AK3" ./packaging/build-zip.sh
+# "bash", not "./": the scripts are committed 0644 so that a clone can be
+# built anywhere, /sdcard included (mounted noexec on this device). Calling
+# them with ./ would fail with EACCES on the very first run.
+OUT="$OUT" DIST="$DIST" AK3="$AK3" bash "$HERE/packaging/build-zip.sh"

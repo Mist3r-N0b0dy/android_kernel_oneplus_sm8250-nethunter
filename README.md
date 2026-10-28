@@ -1,60 +1,78 @@
 # NetHunter kernel — OnePlus 8T (kebab), crDroid 13.x / Android 17
 
 Fork of [`crdroidandroid/android_kernel_oneplus_sm8250`](https://github.com/crdroidandroid/android_kernel_oneplus_sm8250),
-branch `17.0`. The NetHunter work is **ordinary commits on top of upstream**, on
-the branch **`nethunter/17.0`** — nothing is carried as a patch series or as
-out-of-tree modules: every driver listed below is linked into `vmlinux`.
+branch `17.0`. The NetHunter work is **ordinary commits on top of upstream**,
+on the branch **`nethunter/17.0`** — no patch series, no out-of-tree modules:
+everything below is linked into `vmlinux`.
 
 ```bash
-git log --oneline upstream/17.0..nethunter/17.0     # 12 commits
-git diff upstream/17.0..nethunter/17.0 --stat
+git log --oneline upstream/17.0..nethunter/17.0    # each message says what it fixes
 ```
 
-Two of the twelve are the vendor drop of the external Wi-Fi drivers, kept
-**pristine** so the delta stays readable:
-
-```bash
-git diff 3907ab4bf..HEAD -- drivers/net/wireless/nethunter/rtl8812au
-git diff 178ec22e2..HEAD -- drivers/net/wireless/nethunter/rtl8822bu
-```
+Two of those commits are the vendor drop of the external Wi-Fi drivers
+(rtl8812au, rtl8822bu), kept **pristine** so the delta stays readable.
 
 ## Validated
 
-In daily use on a KB2003 (slot `_a`), crDroid 13.x / Android 17, Magisk 31.1.
-Last full validation **2026-10-27**:
+Daily use on a KB2003 (slot `_a`), crDroid 13.x / Android 17, Magisk 31.1.
+Last full validation **2026-10-28**:
 
 ```
 4.19.325-cip135-st19-perf-g66e230426430-Mist3r_N0b0dy  #1 SMP PREEMPT
-built with Android clang 12.0.7 (r416183b1), CONFIG_CFI_CLANG + THINLTO
+Android clang 12.0.7 (r416183b1), CONFIG_CFI_CLANG + THINLTO, CC_WERROR=y
 ```
 
 | what | how to check on the device | state |
 |---|---|---|
-| the running kernel is this build | `uname -r`, `/proc/version` | name + `(Mist3r_N0b0dy@nethunter-op8t)` |
-| the running config is this tree's | `zcat /proc/config.gz \| grep CONFIG_CC_WERROR` | `=y` (`IKCONFIG`) |
-| CFI / LTO enforced | same file, `CFI_CLANG` `CFI_CLANG_SHADOW` `LTO_CLANG` `THINLTO` | all `=y`, `CFI_PERMISSIVE` off |
-| 16 USB drivers built in (Wi-Fi, SDR, ethernet) | `ls /sys/bus/usb/drivers` | ath9k_htc, carl9170, dvb_usb_rtl28xxu, mt7601u, mt76x2u, p54usb, r8188eu, rt2500usb, rt2800usb, rtl8150, rtl8187, rtl8192cu, rtl88x2bu, rtl88XXau, rtl8xxxu, zd1211rw |
-| p54usb + NCI core | `grep -w p54u_driver /proc/kallsyms`, then `nci_register_device` | both present |
+| CFI / LTO enforced | `zcat /proc/config.gz \| grep -E 'CFI_CLANG\|THINLTO'` | all `=y`, `CFI_PERMISSIVE` off |
+| zero modules | `wc -l < /proc/modules` | 0 |
+| 16 USB drivers built in | `ls /sys/bus/usb/drivers` | ath9k_htc, carl9170, dvb_usb_rtl28xxu, mt7601u, mt76x2u, p54usb, r8188eu, rtl8150, rtl8187, rtl8192cu, rtl88x2bu, rtl88XXau, rtl8xxxu, rt2500usb, rt2800usb, zd1211rw |
+| monitor mode, internal chip | `echo 4 > /sys/module/wlan/parameters/con_mode` | `wlan0` turns `type monitor` |
+| monitor channel hopping | `airodump-ng --band bg wlan0` (no `-c`), 50 s | 5 channels / 33 BSS, no wedged vdev |
+| injection, internal chip | `aireplay-ng --test -D wlan0` | 30/30 = 100 %, `Injection is working!` |
+| injection, RTL8812AU / RTL8822BU | same, on `rtl88XXau` / `rtl88x2bu` | 25/30 = 83 % / 24/30 = 80 % |
 | CAN stack | `ip link add dev vcan0 type vcan` | works |
-| USB gadget + HID | `mount -t configfs configfs /sys/kernel/config` then `mkdir …/usb_gadget/g/functions/hid.usb0` | works |
-| NFC | `/dev/nq-nci` | present, chip driver `NFC_NQ` |
-| netfilter | `iptables -L -n` | chains in place |
-| zero-module policy | `wc -l < /proc/modules` | 0 |
+| NFC, p54usb | `/dev/nq-nci`; `grep -w p54u_driver /proc/kallsyms` | both present |
+| USB gadget + HID | configfs `…/usb_gadget/g/functions/hid.usb0` | works |
+| Docker networking | `zcat /proc/config.gz \| grep CONFIG_IPVLAN` | `=y` |
 
-Not validated — needs hardware that was not plugged in: monitor mode and frame
-injection, Bluetooth, GS_USB, SDR (RTL28xxU), USB-UAS, USB-serial.
+Not validated — nothing plugged in: Bluetooth, GS_USB, SDR (RTL28xxU),
+USB-UAS, USB-serial. ATH6KL and MWIFIEX build in, but this ROM ships no
+firmware for them.
+
+## Monitor mode and frame injection
+
+`echo 4 > /sys/module/wlan/parameters/con_mode` brings `wlan0` up as
+`type monitor`, `echo 0 >` gives it back to Android. Three things stood in the
+way, all fixed here:
+
+- **the vdev could not hop.** `MAC0` is single-band, so `wma_is_dbs_mandatory()`
+  forces SMM -> DBS before any monitor vdev starts, and the psoc restart keeps
+  the pdev busy for seconds; a channel change in that window is refused by the
+  firmware, and that refusal used to wedge the vdev for the whole session —
+  Android's Wi-Fi then only came back on reboot. The mode change now happens
+  once per session, a hop is only asked of a vdev in `INIT`/`UP`, and a refusal
+  is reported as the end of the restart it sits in, not as `START_REQ_FAIL`.
+- **quiet time between hops.** Measured with airodump-ng: 1 s crashes the
+  phone, 2 s holds, 3 s and 6 s scan no faster. 2 s ships, so a full
+  13-channel sweep takes ~30 s.
+- **`iwconfig mode monitor` tripped CFI.** `cfg80211_wext_siwmode()` and
+  `giwmode()` took a `u32 *` behind an `(iw_handler)` cast; they now take a
+  `union iwreq_data *`, like the rest of wext.
+
+Injection expects a **bare 802.11 frame** (no radiotap): the TX path drops
+anything whose `fc_type` is not management.
 
 ## Install
 
-The first public release is **v1.0.0** (2026-10-27). After that, one tag per
-crDroid build: a zip only matches the ROM build it was built against.
-
-Requirements: a kebab (OnePlus 8T) on crDroid 13.x / Android 17, and the zip
-built or published for **that** crDroid build. The installer patches the
-**active slot only**; the other slot keeps whatever it had.
+**v1.1.0** (2026-10-28) adds monitor mode and injection on the internal chip;
+**v1.0.0** (2026-10-27) was the first release. Zips are in
+[Releases](../../releases) — one per crDroid build, because a zip only matches
+the ROM build it was built against. The installer patches the **active slot
+only**, the other one keeps whatever it had.
 
 ```bash
-# 1. keep a way back (in the recovery, which is root):
+# 1. a way back, from the recovery (root):
 adb exec-out dd if=/dev/block/by-name/boot_a > boot_a-backup.img
 
 # 2. flash
@@ -63,27 +81,18 @@ adb sideload NetHunter-Kernel-<release>-kebab-AnyKernel3.zip
 
 # 3. verify after the reboot
 uname -r                       # 4.19.325-…-Mist3r_N0b0dy
-zcat /proc/config.gz | grep CONFIG_NFC_NCI
 ```
 
-The recovery log prints the banner and the release details *after* `write_boot`,
-so `Done!` lands just below them and the art stays in the log.
-
-**Flashing from the Magisk app does not work, on purpose.** The zip is an
-AnyKernel3 kernel, not a Magisk module: Magisk writes a boot image
-all-or-nothing and cannot hand it over to the installer. The zip carries a
-`module.prop` so that Magisk runs `customize.sh` instead of answering
-"This is not a Magisk module", and that script prints the same banner, the same
-details, and says to use the recovery. Nothing is installed in that case.
-
-To go back: `fastboot flash boot boot_a-backup.img` (or write the image back
-with `dd` from the recovery).
+**The Magisk app cannot flash this**, on purpose: it is an AnyKernel3 kernel,
+not a module. The zip carries a `module.prop` only so that Magisk runs
+`customize.sh` and says to use the recovery; nothing is installed that way.
+To go back: `fastboot flash boot boot_a-backup.img`.
 
 ## Build
 
-The tree is **not** built on the phone: it needs an x86_64 host with an LLVM
-toolchain for arm64 (Android clang r416183b1 / 12.0.7 or newer), ~16 GB free
-and `bison`, `flex`, `bc`, `libssl-dev`, `libelf-dev`, `zip`, `unzip`.
+Not on the phone: an x86_64 host, an arm64 LLVM toolchain (Android clang
+r416183b1 / 12.0.7 or newer), ~16 GB free, `bison flex bc libssl-dev
+libelf-dev zip unzip`.
 
 ```bash
 git clone https://github.com/Mist3r-N0b0dy/android_kernel_oneplus_sm8250-nethunter
@@ -92,37 +101,17 @@ CLANG_DIR=/path/to/clang/bin ./build.sh
 # -> dist/NetHunter-Kernel-<kernel.release>-kebab-AnyKernel3.zip
 ```
 
-`build.sh` checks the toolchain, merges the three config files, verifies what a
-wrong compiler silently drops (`CFI_CLANG`, `LTO_CLANG`, `THINLTO`, the release
-string, zero modules) *before* compiling, builds `Image`, then calls
-`packaging/build-zip.sh`, which fetches the AnyKernel3 installer once into
-`~/.cache/nethunter/AnyKernel3` (outside the tree, pinned by commit).
-`--no-zip` stops after the image.
+`build.sh` checks the toolchain, merges `vendor/kona-perf_defconfig` +
+`vendor/oplus.config` + `arch/arm64/configs/nethunter.fragment`, verifies what
+a wrong compiler drops in silence (`CFI_CLANG`, `LTO_CLANG`, `THINLTO`, the
+release string, zero modules) **before** compiling, builds `Image`, then calls
+`packaging/build-zip.sh`. `--no-zip` stops after the image.
 
-The config is `arch/arm64/configs/nethunter.fragment`, merged on top of
-`vendor/kona-perf_defconfig` + `vendor/oplus.config` (both are required: without
-`oplus.config`, `schgm-flash.c` fails on an incomplete `struct smb_charger`). A
-fragment rather than a saved defconfig, because `CFI_CLANG`, `LTO_CLANG` and
-`THINLTO` are decided by the build host's compiler and a defconfig generated
-elsewhere loses them without a word. The release string lives there too
-(`CONFIG_LOCALVERSION`), so a clone names its kernel by itself.
-
--Werror is **on** (`CONFIG_CC_WERROR=y`): a warning is a hard error, including
-on every line this fork wrote. The only exceptions are four named diagnostic
-classes inside the two third-party driver trees, downgraded with `-Wno-error=`
-in their own Makefiles. They keep printing — 500 of them, all in vendor code.
-
-## What the commits are for
-
-| Commit | Problem it removes |
-|---|---|
-| `wireless: build both vendored drivers in-tree` | `-I$(src)/` resolves to `out/…` with `O=out`; 2625 globals duplicated by the two drivers; a macro that overrides a rename |
-| `rtl8812au: compile with clang 12 and satisfy CFI` | the aircrack-ng tree assumes a newer toolchain: 31 tasklets declared `void (*)(void *)` where the kernel imposes `void (*)(unsigned long)`, and `rtw_xmit_entry` returning `int` instead of `netdev_tx_t` — invisible to the compiler, fatal to CFI (panic on the first TX) |
-| `rtl8822bu: compile with clang 12 and satisfy CFI` | same two classes for the morrownr tree: 51 tasklets, 3 xmit callbacks |
-| `vendored drivers: rename the globals two copies share` | as modules their generic globals were alone; in one `vmlinux` the `htc_*` helpers collide with the other `ath` drivers, and `char *ifname = "wlan%d"` is defined by both Realtek drivers (`ld.lld: duplicate symbol: ifname`) |
-| `r8188eu: allow CONFIG_R8188EU=y` | its Kconfig had `depends on m`, so `=y` was discarded in silence and the whole `LIB80211` chain stayed modular |
-| `nfs: make the client build and link on this vendor tree` | the LineageOS backport keeps the pre-5.0 `readpage_async_filler()` signature, and a sunrpc callback declaration no longer matches its definition once the options are built in |
-| `usb: storage: uas: force BOT on the RTL9210` | bridges that advertise UAS and break on the first command queue |
+The config is a fragment rather than a defconfig because `CFI_CLANG`,
+`LTO_CLANG` and `THINLTO` are decided by the build host's compiler; the release
+string (`CONFIG_LOCALVERSION`) lives there too, so a clone names its own
+kernel. `-Werror` is on: a warning is a hard error, including on lines this
+fork wrote.
 
 ## Following crDroid
 
@@ -134,11 +123,3 @@ git rebase upstream/17.0          # conflicts here are the whole point
 If a commit no longer applies because upstream fixed it, **drop it** — the
 series is not a museum. Then rebuild, re-validate, and tag one release per
 crDroid build.
-
-## Related
-
-- [Boot animation](https://github.com/Mist3r-N0b0dy/Bootanimation-OP8T-Magisk-Module-A17):
-  the animation with sound, packaged as a Magisk module independent of this
-  kernel.
-- Build logs, test matrices and the discarded drafts are **not** here. They are
-  our notes, and they stay on our own machines.

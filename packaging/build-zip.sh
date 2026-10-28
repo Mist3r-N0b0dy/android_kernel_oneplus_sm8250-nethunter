@@ -126,8 +126,8 @@ chmod 755 "$WORK/customize.sh"
 cat > "$WORK/module.prop" <<EOF
 id=nethunter-kernel-notice
 name=NetHunter Kernel (recovery only)
-version=$REL
-versionCode=1
+version=1.1.0 ($REL)
+versionCode=10100
 author=Mist3r_N0b0dy
 description=AnyKernel3 kernel image, not a Magisk module. Flash it in the recovery over adb (adb sideload); this install only tells you that.
 EOF
