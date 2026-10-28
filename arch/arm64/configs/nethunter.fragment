@@ -50,6 +50,20 @@ CONFIG_ATH9K_HTC=y
 CONFIG_CARL9170=y
 CONFIG_MT7601U=y
 CONFIG_MT76x2U=y
+# ATH6KL_USB: AR6004-based adapters. Mainline code, so no CFI work needed.
+# Caveat, measured: this ROM ships no ath6k firmware at all (/vendor/firmware
+# has no AR6004 blob), so the adapter enumerates and then fails the upload.
+# The driver is kept anyway -- it is one symbol -- and the firmware path is
+# /vendor/firmware/ath6k/AR6004/hw*/..., which a Magisk module can provide
+# (linux-firmware carries those files).
+CONFIG_ATH6KL=y
+CONFIG_ATH6KL_USB=y
+# MWIFIEX_USB: Marvell 8766/8797/8997 (USB8766, USB8997...). Same caveat as
+# ath6kl: the ROM ships no mrvl/ firmware, so the adapter probes and then fails
+# the download. Firmware path: /vendor/firmware/mrvl/{usb8797_uapsta.bin,
+# usbusb8997_combo_v4.bin,...}, available in linux-firmware.
+CONFIG_MWIFIEX=y
+CONFIG_MWIFIEX_USB=y
 CONFIG_RTL8187=y
 CONFIG_RTL8192CU=y
 CONFIG_RTL8XXXU=y
@@ -201,6 +215,7 @@ CONFIG_VETH=y
 CONFIG_BRIDGE=y
 CONFIG_BRIDGE_NETFILTER=y
 CONFIG_MACVLAN=y
+CONFIG_IPVLAN=y
 CONFIG_VXLAN=y
 CONFIG_DUMMY=y
 CONFIG_NET_NS=y
@@ -312,6 +327,13 @@ CONFIG_TUN=y
 CONFIG_I2C_CHARDEV=y
 CONFIG_SPI_SPIDEV=y
 CONFIG_GPIO_SYSFS=y
+
+# --- debugfs: injection statistics ------------------------------------------
+# The frame injection patch registers its per-adapter counters under debugfs.
+# Without CONFIG_DEBUG_FS it only prints "Failed to create debugfs entries: 4"
+# at every monitor init, and the only way to know what the injection queue did
+# is to grep dmesg for the drop counters.
+CONFIG_DEBUG_FS=y
 
 # --- must be OFF (out-of-tree drivers are insmod'ed) ------------------------
 # CONFIG_MODULE_SIG is not set
