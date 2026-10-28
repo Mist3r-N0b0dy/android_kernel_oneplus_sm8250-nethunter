@@ -1447,6 +1447,10 @@ struct hdd_adapter {
 	uint16_t latency_level;
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 	bool monitor_mode_vdev_up_in_progress;
+	/* set once the psoc runs in DBS, which monitor mode needs */
+	bool monitor_mode_dbs_ready;
+	/* earliest jiffies at which the next monitor hop may be issued */
+	unsigned long mon_hop_not_before;
 #endif
 	/* rcpi information */
 	struct rcpi_info rcpi;

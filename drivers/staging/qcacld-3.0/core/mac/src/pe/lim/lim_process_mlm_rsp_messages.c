@@ -2860,14 +2860,38 @@ static void lim_handle_mon_switch_channel_rsp(struct pe_session *session,
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Set channel failed for monitor mode");
-		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
-					      WLAN_VDEV_SM_EV_START_REQ_FAIL,
-					      0, NULL);
-		return;
-	}
 
-	wlan_vdev_mlme_sm_deliver_evt(session->vdev,
-				      WLAN_VDEV_SM_EV_START_SUCCESS, 0, NULL);
+		if (wlan_vdev_mlme_get_state(session->vdev) == WLAN_VDEV_S_START &&
+		    wlan_vdev_mlme_get_substate(session->vdev) ==
+					WLAN_VDEV_SS_START_RESTART_PROGRESS) {
+			/*
+			 * The firmware refused the restart, so the vdev still runs on
+			 * its previous channel: from the state machine's point of view
+			 * the restart is simply over. Feeding it a START failure here
+			 * (which this state does not handle) is what used to leave it
+			 * in ST-RESTART_PROG for good, killing the monitor and even the
+			 * driver mode change back to mission mode, i.e. Android Wi-Fi,
+			 * until the phone was rebooted.
+			 */
+			wlan_vdev_mlme_sm_deliver_evt(session->vdev,
+						      WLAN_VDEV_SM_EV_RESTART_RESP,
+						      0, NULL);
+		} else {
+			wlan_vdev_mlme_sm_deliver_evt(session->vdev,
+						      WLAN_VDEV_SM_EV_START_REQ_FAIL,
+						      0, NULL);
+			return;
+		}
+
+		/*
+		 * Fall through: the vdev is up (on the old channel), let SME know so
+		 * that the caller is released. HDD compares the channel it gets back
+		 * with the one it asked for and returns -EAGAIN when it differs.
+		 */
+	} else {
+		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
+					      WLAN_VDEV_SM_EV_START_SUCCESS, 0, NULL);
+	}
 
 	message.type = eWNI_SME_MONITOR_MODE_VDEV_UP;
 	message.bodyval = session->vdev_id;

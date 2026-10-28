@@ -2692,6 +2692,16 @@ static int __hdd_mon_open(struct net_device *dev)
 	if (ret)
 		return ret;
 
+	/*
+	 * New monitor session, unknown channel: forget the previous one so that
+	 * the first set_mon_ch of this session performs the hardware mode change
+	 * instead of being mistaken for a same-band hop.
+	 */
+	adapter->mon_chan_freq = 0;
+	adapter->mon_bandwidth = 0;
+	adapter->monitor_mode_dbs_ready = false;
+	adapter->mon_hop_not_before = 0;
+
 	set_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
 
 	/*

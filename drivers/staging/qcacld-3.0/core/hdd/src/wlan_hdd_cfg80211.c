@@ -135,6 +135,7 @@
 #include "wlan_nl_to_crypto_params.h"
 #include "wlan_crypto_global_def.h"
 #include "cdp_txrx_cfg.h"
+#include <wlan_objmgr_vdev_obj.h>
 #include "wlan_hdd_object_manager.h"
 #include "nan_ucfg_api.h"
 #include "wlan_fwol_ucfg_api.h"
@@ -24257,6 +24258,93 @@ static int wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 }
 
 /**
+ * hdd_mon_vdev_chan_ready() - can this vdev take a channel change?
+ * @adapter: monitor adapter
+ *
+ * lim_mon_change_channel() only knows what to do with a vdev that is INIT
+ * (start it on the new channel) or UP (restart it on the new channel). Any
+ * other state -- in practice the restart that follows a hardware mode change
+ * -- is answered with "Invalid vdev state to change channel" and leaves the
+ * state machine where it was, so such a request has to be refused early.
+ *
+ * Return: true if the vdev is in a state a channel change can be issued in.
+ */
+static bool hdd_mon_vdev_chan_ready(struct hdd_adapter *adapter)
+{
+	struct wlan_objmgr_vdev *vdev;
+	enum wlan_vdev_state state;
+
+	vdev = hdd_objmgr_get_vdev(adapter);
+	if (!vdev)
+		return false;
+
+	state = wlan_vdev_mlme_get_state(vdev);
+	hdd_objmgr_put_vdev(vdev);
+
+	return state == WLAN_VDEV_S_INIT || state == WLAN_VDEV_S_UP;
+}
+
+/**
+ * hdd_mon_vdev_chan_freq() - channel the monitor vdev currently runs on
+ * @adapter: monitor adapter
+ *
+ * The firmware is the only one that knows whether a vdev restart was applied,
+ * so read it back from the vdev instead of trusting the request.
+ *
+ * Return: centre frequency in MHz, or 0 when it is not known yet.
+ */
+static uint16_t hdd_mon_vdev_chan_freq(struct hdd_adapter *adapter)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_channel *chan;
+	uint16_t freq = 0;
+
+	vdev = hdd_objmgr_get_vdev(adapter);
+	if (!vdev)
+		return 0;
+
+	chan = wlan_vdev_mlme_get_bss_chan(vdev);
+	if (chan)
+		freq = chan->ch_freq;
+
+	hdd_objmgr_put_vdev(vdev);
+
+	return freq;
+}
+
+/**
+ * hdd_mon_vdev_settle() - wait until the vdev stopped restarting
+ * @adapter: monitor adapter
+ * @budget_ms: how long to wait at most
+ *
+ * A hardware mode change restarts this vdev a second time, about 250 ms after
+ * it came back up (measured in hop3-20261028). A channel change issued in that
+ * window has its response dropped by the vdev state machine and the vdev stays
+ * in ST-RESTART_PROG for good, so wait both for the restart to land and for
+ * the vdev to stay up afterwards.
+ *
+ * Return: true if the vdev ended up in a state a channel change can use.
+ */
+static bool hdd_mon_vdev_settle(struct hdd_adapter *adapter, int budget_ms)
+{
+	int i;
+	int stable = 0;
+
+	for (i = 0; i < budget_ms / 100; i++) {
+		qdf_mdelay(100);
+		if (!hdd_mon_vdev_chan_ready(adapter)) {
+			stable = 0;
+			continue;
+		}
+		/* 2 s without a state change means the restart is over */
+		if (++stable >= 20)
+			break;
+	}
+
+	return hdd_mon_vdev_chan_ready(adapter);
+}
+
+/**
  * wlan_hdd_cfg80211_set_mon_ch() - Set monitor mode capture channel
  * @wiphy: Handle to struct wiphy to get handle to module context.
  * @chandef: Contains information about the capture channel to be set.
@@ -24282,6 +24370,8 @@ static int __wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
 	enum channel_state chan_freq_state;
 	uint8_t max_fw_bw;
 	enum phy_ch_width ch_width;
+	bool did_hw_change = false;
+	int i;
 
 	hdd_enter();
 
@@ -24344,15 +24434,74 @@ static int __wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
 					     chandef->chan->center_freq,
 					     0, &ch_params);
 
-	if (wlan_hdd_change_hw_mode_for_given_chnl(adapter,
-						   chandef->chan->center_freq,
-						   POLICY_MGR_UPDATE_REASON_SET_OPER_CHAN)) {
-		hdd_err("Failed to change hw mode");
-		return -EINVAL;
+	/*
+	 * A monitor vdev cannot start in SMM on this target: MAC0 carries a single
+	 * band, wma_is_dbs_mandatory() reports "MAC0 does not support both bands 2
+	 * DBS is mandatory", and the firmware then answers the vdev start with a
+	 * failure ("Set channel failed for monitor mode"). The hardware mode change
+	 * is therefore required -- but it is expensive: it restarts the psoc and
+	 * reloads the firmware (~350 ms measured). A channel change issued while
+	 * that restart is in flight gets its response dropped by the vdev state
+	 * machine ("event 5 not handled in state ST-RESTART_PROG"), which then
+	 * stays in RESTART_PROG for good: lim_mon_change_channel() only accepts
+	 * INIT or UP, every later request fails with "Invalid vdev state to change
+	 * channel", and even con_mode=0 can no longer restart the mission mode, so
+	 * the phone has no Wi-Fi until it is rebooted.
+	 *
+	 * So: once per monitor session, before the first channel, and wait for the
+	 * restart to land before asking the vdev to switch.
+	 */
+	if (!adapter->monitor_mode_dbs_ready) {
+		if (wlan_hdd_change_hw_mode_for_given_chnl(
+			    adapter, chandef->chan->center_freq,
+			    POLICY_MGR_UPDATE_REASON_SET_OPER_CHAN)) {
+			hdd_err("Failed to change hw mode");
+			return -EINVAL;
+		}
+		hdd_info("monitor mode: waiting for the vdev restart to land");
+		hdd_mon_vdev_settle(adapter, 6000);
+		adapter->monitor_mode_dbs_ready = true;
+		did_hw_change = true;
 	}
 
+	/*
+	 * Checked before touching the hardware: a request that overlaps the
+	 * previous one has to fail fast instead of restarting the vdev first.
+	 */
 	if (adapter->monitor_mode_vdev_up_in_progress) {
 		hdd_err_rl("monitor mode vdev up in progress");
+		return -EBUSY;
+	}
+
+	/*
+	 * Same idea, one level deeper: while the vdev is anywhere else than INIT
+	 * or UP -- measured: 250 ms after a successful channel set the hardware
+	 * mode change restarts it again -- the firmware answers the request with
+	 * "Invalid vdev state to change channel" and the state machine never
+	 * leaves ST-RESTART_PROG, after which every later request is refused and
+	 * only a reboot brings Wi-Fi back. The first channel of a session is
+	 * exempt: there mon_chan_freq is still 0 and the vdev has just been
+	 * created by the monitor open path.
+	 */
+	if (adapter->mon_chan_freq && !hdd_mon_vdev_chan_ready(adapter)) {
+		hdd_err_rl("monitor vdev not ready for a channel change");
+		return -EBUSY;
+	}
+
+	/*
+	 * The hardware mode change keeps the pdev busy long after the vdev is back
+	 * up: a restart issued too early is refused by the firmware ("Set channel
+	 * failed for monitor mode") and that answer wedges the vdev state machine
+	 * for good, so the monitor dies and even con_mode=0 leaves Android without
+	 * Wi-Fi. Keep a quiet period between two accepted hops: 2 s, measured on
+	 * this target (1 s crashes the phone). Airodump-ng retries every 500 ms,
+	 * so it simply gets -EBUSY until the period is over, then hops -- which is
+	 * why a full 13-channel sweep takes ~30 s and not 6.5 s.
+	 */
+	if (adapter->mon_chan_freq &&
+	    time_before(jiffies, adapter->mon_hop_not_before)) {
+		hdd_err_rl("monitor mode: hop too early, %u ms to go",
+			   jiffies_to_msecs(adapter->mon_hop_not_before - jiffies));
 		return -EBUSY;
 	}
 
@@ -24399,6 +24548,44 @@ static int __wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
 
 	adapter->mon_chan_freq = chandef->chan->center_freq;
 	adapter->mon_bandwidth = ch_width;
+
+	/*
+	 * The hardware mode change restarts this vdev once more, ~250 ms after it
+	 * is back up (measured). Do not return before that happened and the vdev
+	 * is usable again: airodump-ng hops again right away and its request
+	 * would land inside the restart.
+	 */
+	if (did_hw_change && !hdd_mon_vdev_settle(adapter, 6000))
+		hdd_warn("monitor vdev did not settle after the hw mode change");
+
+	/*
+	 * The firmware can refuse the restart (it keeps the pdev busy for a few
+	 * seconds after a channel change). The vdev then still runs on the channel
+	 * it had before; do not report a success, airodump-ng would believe it
+	 * swept a channel it never visited.
+	 */
+	for (i = 0; i < 6; i++) {
+		if (hdd_mon_vdev_chan_freq(adapter) ==
+		    chandef->chan->center_freq)
+			break;
+		qdf_mdelay(50);
+	}
+	if (hdd_mon_vdev_chan_freq(adapter) &&
+	    hdd_mon_vdev_chan_freq(adapter) != chandef->chan->center_freq) {
+		hdd_err("monitor mode: vdev stayed on %u MHz, hop not applied",
+			hdd_mon_vdev_chan_freq(adapter));
+		return -EAGAIN;
+	}
+
+	/*
+	 * 1 s of quiet crashes the phone; 2 s holds (33 BSS over five channels,
+	 * 30/30 injection), 3 s and 6 s work but scan no faster. 2 s ships:
+	 * airodump-ng asks every 500 ms and takes the channel once it is over.
+	 */
+	adapter->mon_hop_not_before = jiffies + msecs_to_jiffies(2000);
+
+	hdd_info("monitor mode channel set to %u MHz",
+		  chandef->chan->center_freq);
 
 	hdd_exit();
 
