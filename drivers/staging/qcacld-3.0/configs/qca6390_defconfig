@@ -636,6 +636,10 @@ CONFIG_WLAN_CONV_SPECTRAL_ENABLE := y
 CONFIG_WLAN_SPECTRAL_ENABLE := y
 CONFIG_WMI_CMD_STRINGS := y
 CONFIG_FEATURE_MONITOR_MODE_SUPPORT := y
+# Monitor-mode frame injection. Profile builds (the kernel .config sets
+# CONFIG_QCA_CLD_WLAN_PROFILE="qca6390") read this file, NOT default_defconfig,
+# so the flag has to be here or the feature silently compiles out.
+CONFIG_FEATURE_FRAME_INJECTION_SUPPORT := y
 CONFIG_WLAN_ALLOCATE_GLOBAL_BUFFERS_DYNAMICALLY := n
 CONFIG_WLAN_FEATURE_TWT := y
 
