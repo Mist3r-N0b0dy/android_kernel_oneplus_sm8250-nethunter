@@ -31,8 +31,16 @@ int cfg80211_wext_giwname(struct net_device *dev,
 }
 EXPORT_WEXT_HANDLER(cfg80211_wext_giwname);
 
+/*
+ * NOTE: the third argument is the real iw_handler type (and not, as it used
+ * to be here, u32 *mode / u32 *mode). The handlers are installed in
+ * cfg80211_handlers[] as iw_handler, and wext-core.c calls them back through
+ * that pointer after handing over &iwr->u : any other prototype makes the
+ * indirect call a CFI (CONFIG_CFI_CLANG) violation, which is fatal on an
+ * enforcing kernel and also reads the wrong offset for the mode value.
+ */
 int cfg80211_wext_siwmode(struct net_device *dev, struct iw_request_info *info,
-			  u32 *mode, char *extra)
+			  union iwreq_data *wrqu, char *extra)
 {
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
 	struct cfg80211_registered_device *rdev;
@@ -41,7 +49,7 @@ int cfg80211_wext_siwmode(struct net_device *dev, struct iw_request_info *info,
 
 	rdev = wiphy_to_rdev(wdev->wiphy);
 
-	switch (*mode) {
+	switch (wrqu->mode) {
 	case IW_MODE_INFRA:
 		type = NL80211_IFTYPE_STATION;
 		break;
@@ -68,7 +76,7 @@ int cfg80211_wext_siwmode(struct net_device *dev, struct iw_request_info *info,
 EXPORT_WEXT_HANDLER(cfg80211_wext_siwmode);
 
 int cfg80211_wext_giwmode(struct net_device *dev, struct iw_request_info *info,
-			  u32 *mode, char *extra)
+			  union iwreq_data *wrqu, char *extra)
 {
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
 
@@ -77,25 +85,25 @@ int cfg80211_wext_giwmode(struct net_device *dev, struct iw_request_info *info,
 
 	switch (wdev->iftype) {
 	case NL80211_IFTYPE_AP:
-		*mode = IW_MODE_MASTER;
+		wrqu->mode = IW_MODE_MASTER;
 		break;
 	case NL80211_IFTYPE_STATION:
-		*mode = IW_MODE_INFRA;
+		wrqu->mode = IW_MODE_INFRA;
 		break;
 	case NL80211_IFTYPE_ADHOC:
-		*mode = IW_MODE_ADHOC;
+		wrqu->mode = IW_MODE_ADHOC;
 		break;
 	case NL80211_IFTYPE_MONITOR:
-		*mode = IW_MODE_MONITOR;
+		wrqu->mode = IW_MODE_MONITOR;
 		break;
 	case NL80211_IFTYPE_WDS:
-		*mode = IW_MODE_REPEAT;
+		wrqu->mode = IW_MODE_REPEAT;
 		break;
 	case NL80211_IFTYPE_AP_VLAN:
-		*mode = IW_MODE_SECOND;		/* FIXME */
+		wrqu->mode = IW_MODE_SECOND;		/* FIXME */
 		break;
 	default:
-		*mode = IW_MODE_AUTO;
+		wrqu->mode = IW_MODE_AUTO;
 		break;
 	}
 	return 0;
